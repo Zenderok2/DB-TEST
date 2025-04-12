@@ -8,182 +8,240 @@ import jwt from "jsonwebtoken";
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
-const SECRET_KEY = "1234";
+const SECRET_KEY = process.env.SECRET_KEY || "secure_secret_key";
 
 const db = new pg.Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
 });
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN,
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 
-app.post("/register", async (req, res) =>
-{
-    try
-    {
-        const { username, password, fullname, dob, email, phone } = req.body;
-        if (!username || !password || !fullname || !dob || !email || !phone)
-            return res.status(400).json({ message: "Заполните все поля" });
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const result = await db.query(
-            `INSERT INTO "Users" (username, password, fullname, dataofbirth, email, phone)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING user_id`,
-            [username, hashedPassword, fullname, dob, email, phone]
-        );
-
-        const token = jwt.sign({ userId: result.rows[0].user_id }, SECRET_KEY, { expiresIn: "24h" });
-
-        res.json({ message: "Регистрация успешна", token });
+// Регистрация пользователя
+app.post("/register", async (req, res) => {
+  try {
+    const { username, password, fullname, dob, email, phone } = req.body;
+    
+    if (!username || !password || !fullname || !dob || !email || !phone) {
+      return res.status(400).json({ message: "Все поля обязательны для заполнения" });
     }
-    catch (error)
-    {
-        res.status(500).json({ message: "Ошибка сервера", error: error.message });
+
+    // Проверка существующего пользователя
+    const userExists = await db.query(
+      `SELECT * FROM "Users" WHERE username = $1 OR email = $2`,
+      [username, email]
+    );
+
+    if (userExists.rows.length > 0) {
+      return res.status(409).json({ message: "Пользователь с таким логином или почтой уже существует" });
     }
+
+    // Хеширование пароля
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Создание пользователя
+    const newUser = await db.query(
+      `INSERT INTO "Users" 
+        (username, password, fullname, dateofbirth, email, phone)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING user_id, username, email`,
+      [username, hashedPassword, fullname, dob, email, phone]
+    );
+
+    // Генерация токена
+    const token = jwt.sign(
+      { userId: newUser.rows[0].user_id },
+      SECRET_KEY,
+      { expiresIn: "24h" }
+    );
+
+    res.status(201).json({
+      message: "Регистрация успешна",
+      token,
+      user: newUser.rows[0]
+    });
+
+  } catch (error) {
+    console.error("Ошибка регистрации:", error);
+    res.status(500).json({ 
+      message: "Ошибка сервера",
+      error: error.message 
+    });
+  }
 });
 
-app.post("/login", async (req, res) =>
-{
-    try
-    {
-        const { username, password } = req.body;
-        if (!username || !password)
-            return res.status(400).json({ message: "Заполните все поля" });
+// Авторизация пользователя
+app.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-        const user = await db.query(
-            `SELECT * FROM "Users" WHERE username = $1 OR email = $1`,
-            [username]
-        );
-
-        if (user.rows.length === 0)
-            return res.status(401).json({ message: "Неверные учетные данные" });
-
-        const validPassword = await bcrypt.compare(password, user.rows[0].password);
-        if (!validPassword)
-            return res.status(401).json({ message: "Неверные учетные данные" });
-
-        const token = jwt.sign({ userId: user.rows[0].user_id }, SECRET_KEY, { expiresIn: "1h" });
-
-        res.json({
-            token,
-            user: {
-                username: user.rows[0].username,
-                email: user.rows[0].email
-            }
-        });
+    if (!username || !password) {
+      return res.status(400).json({ message: "Все поля обязательны для заполнения" });
     }
-    catch (error)
-    {
-        res.status(500).json({ message: "Ошибка сервера", error: error.message });
+
+    // Поиск пользователя
+    const user = await db.query(
+      `SELECT * FROM "Users" 
+       WHERE username = $1 OR email = $1`,
+      [username]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(401).json({ message: "Неверные учетные данные" });
     }
+
+    // Проверка пароля
+    const validPassword = await bcrypt.compare(password, user.rows[0].password);
+    if (!validPassword) {
+      return res.status(401).json({ message: "Неверные учетные данные" });
+    }
+
+    // Генерация токена
+    const token = jwt.sign(
+      { userId: user.rows[0].user_id },
+      SECRET_KEY,
+      { expiresIn: "1h" }
+    );
+
+    res.json({
+      message: "Авторизация успешна",
+      token,
+      user: {
+        userId: user.rows[0].user_id,
+        username: user.rows[0].username,
+        email: user.rows[0].email
+      }
+    });
+
+  } catch (error) {
+    console.error("Ошибка авторизации:", error);
+    res.status(500).json({ 
+      message: "Ошибка сервера",
+      error: error.message 
+    });
+  }
 });
 
-app.post("/bookHotel", async (req, res) =>
-{
-  try
-  {
-    const authH = req.headers.authorization
-    if (!authH)
-      return res.status(401).json({ msg: "Нет токена" })
-      
-    const tk = authH.split(" ")[1]
-    const dec = jwt.verify(tk, SECRET_KEY)
-    const uid = dec.userId
-    let { hotel, room, date } = req.body
-    if (!hotel || !room || !date)
-      return res.status(400).json({ msg: "Заполните все поля" })
-      
-    // Очистим значение типа комнаты
-    room = room.trim()
-      
-    const r = await db.query(
-      `SELECT room_id, price FROM "Rooms" WHERE hotel_id = $1 AND LOWER(status) = LOWER($2)`,
+// Бронирование отеля
+app.post("/bookHotel", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: "Требуется авторизация" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.userId;
+
+    const { hotelId, roomType, checkInDate } = req.body;
+
+    if (!hotelId || !roomType || !checkInDate) {
+      return res.status(400).json({ message: "Все поля обязательны для заполнения" });
+    }
+
+    // Поиск доступной комнаты
+    const room = await db.query(
+      `SELECT room_id, price FROM "Rooms" 
+       WHERE hotel_id = $1 
+         AND LOWER(status) = LOWER($2)
+         AND room_count > 0`,
+      [hotelId, roomType]
+    );
+
+    if (room.rows.length === 0) {
+      return res.status(404).json({ message: "Нет доступных комнат выбранного типа" });
+    }
+
+    // Расчет даты выезда
+    const checkOutDate = new Date(checkInDate);
+    checkOutDate.setDate(checkOutDate.getDate() + 1);
+
+    // Создание бронирования
+    const newBooking = await db.query(
+      `INSERT INTO "Bookings" 
+        (user_id, room_id, checkindate, checkoutdate, totalprice, paystatus)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
+       RETURNING booking_id`,
       [
-        hotel,
-        room
+        userId,
+        room.rows[0].room_id,
+        checkInDate,
+        checkOutDate.toISOString().split('T')[0],
+        room.rows[0].price
       ]
-    )
-    if (r.rows.length === 0)
-      return res.status(400).json({ msg: "Комната не найдена" })
-      
-    const rm = r.rows[0]
-    const checkIn = date
-    const dt = new Date(date)
-    dt.setDate(dt.getDate() + 1)
-    const checkOut = dt.toISOString().split("T")[0]
-    
-    const bk = await db.query(
-      `SELECT * FROM "Bookings" WHERE room_id = $1 AND $2 < checkoutdate AND $3 > checkindate`,
-      [
-        rm.room_id,
-        checkIn,
-        checkOut
-      ]
-    )
-    if (bk.rows.length > 0)
-      return res.status(400).json({ msg: "Комната забронирована" })
-      
-    const bidRes = await db.query(
-      `SELECT COALESCE(MAX(booking_id), 0) + 1 AS bid FROM "Bookings"`
-    )
-    const bid = bidRes.rows[0].bid
-    
+    );
+
+    // Обновление количества комнат
     await db.query(
-      `INSERT INTO "Bookings" (booking_id, user_id, room_id, checkindate, checkoutdate, datecreated, totalprice, paystatus)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, 'pending')`,
-      [
-        bid,
-        uid,
-        rm.room_id,
-        checkIn,
-        checkOut,
-        rm.price
-      ]
-    )
-    
-    res.json({ msg: "Бронирование успешно" })
+      `UPDATE "Rooms" 
+       SET room_count = room_count - 1 
+       WHERE room_id = $1`,
+      [room.rows[0].room_id]
+    );
+
+    res.status(201).json({
+      message: "Бронирование успешно создано",
+      bookingId: newBooking.rows[0].booking_id
+    });
+
+  } catch (error) {
+    console.error("Ошибка бронирования:", error);
+    res.status(500).json({ 
+      message: "Ошибка сервера",
+      error: error.message 
+    });
   }
-  catch (e)
-  {
-    res.status(500).json({ msg: "Ошибка сервера", error: e.message })
-  }
-})
-
-
-
-app.get("/profile", async (req, res) =>
-{
-    try
-    {
-        const authHeader = req.headers.authorization;
-        if (!authHeader)
-            return res.status(401).json({ message: "Нет токена" });
-
-        const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, SECRET_KEY);
-
-        const user = await db.query(
-            `SELECT fullname, dataofbirth, email, phone FROM "Users" WHERE user_id = $1`,
-            [decoded.userId]
-        );
-
-        if (user.rows.length === 0)
-            return res.status(404).json({ message: "Пользователь не найден" });
-
-        res.json(user.rows[0]);
-    }
-    catch (error)
-    {
-        res.status(401).json({ message: "Ошибка авторизации", error: error.message });
-    }
 });
 
-app.listen(port, '0.0.0.0', () => 
-  console.log(`Сервер запущен на http://176.108.251.188:${port}`)
-);
+// Получение профиля пользователя
+app.get("/profile", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: "Требуется авторизация" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, SECRET_KEY);
+
+    const user = await db.query(
+      `SELECT 
+          user_id, 
+          username, 
+          fullname, 
+          dateofbirth, 
+          email, 
+          phone 
+       FROM "Users" 
+       WHERE user_id = $1`,
+      [decoded.userId]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Пользователь не найден" });
+    }
+
+    res.json(user.rows[0]);
+
+  } catch (error) {
+    console.error("Ошибка получения профиля:", error);
+    res.status(500).json({ 
+      message: "Ошибка сервера",
+      error: error.message 
+    });
+  }
+});
+
+// Запуск сервера
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Сервер запущен на http://${process.env.DB_HOST}:${port}`);
+});
