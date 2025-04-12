@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",  // Добавлен параметр доступа извне
+    "dev": "vite --host 0.0.0.0",
     "server": "node server.js",
     "dev:full": "concurrently -n \"BACKEND,FRONTEND\" -c \"bgBlue.bold,bgMagenta.bold\" \"npm run server\" \"npm run dev\"",
     "build": "vite build",
