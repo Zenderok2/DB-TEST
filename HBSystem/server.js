@@ -184,6 +184,6 @@ app.get("/profile", async (req, res) =>
     }
 });
 
-app.listen(port, () =>
-    console.log(`Сервер запущен на http://localhost:${port}`)
+app.listen(port, '0.0.0.0', () => 
+  console.log(`Сервер запущен на http://176.108.251.188:${port}`)
 );
