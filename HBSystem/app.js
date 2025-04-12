@@ -101,7 +101,7 @@ const app = createApp({
       try
       {
         const tk = localStorage.getItem("token")
-        const res = await fetch("http://localhost:3000/bookHotel",
+        const res = await fetch("http://176.108.251.188:3000/bookHotel",
         {
           method: "POST",
           headers:
