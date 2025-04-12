@@ -28,7 +28,7 @@ app.use(express.json());
 // Регистрация пользователя
 app.post("/register", async (req, res) => {
   try {
-    const { username, password, fullname, dob, email, phone } = req.body;
+    const { username, password, fullname, dateofbirth, email, phone } = req.body;
     
     if (!username || !password || !fullname || !dob || !email || !phone) {
       return res.status(400).json({ message: "Все поля обязательны для заполнения" });
@@ -53,7 +53,7 @@ app.post("/register", async (req, res) => {
         (username, password, fullname, dateofbirth, email, phone)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING user_id, username, email`,
-      [username, hashedPassword, fullname, dob, email, phone]
+      [username, hashedPassword, fullname, dateofbirth, email, phone]
     );
 
     // Генерация токена
