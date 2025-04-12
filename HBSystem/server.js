@@ -28,9 +28,9 @@ app.use(express.json());
 // Регистрация пользователя
 app.post("/register", async (req, res) => {
   try {
-    const { username, password, fullname, dateofbirth, email, phone } = req.body;
+    const { username, password, fullname, dob: dateofbirth, email, phone } = req.body;
     
-    if (!username || !password || !fullname || !dob || !email || !phone) {
+    if (!username || !password || !fullname || !dateofbirth || !email || !phone) {
       return res.status(400).json({ message: "Все поля обязательны для заполнения" });
     }
 
