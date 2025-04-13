@@ -94,34 +94,38 @@ const app = createApp({
       const usr = localStorage.getItem("loggedInUser")
       this.isAuth = !!(tk && usr)
     },
-    async bookHotel()
-    {
-      if (!this.bk.date || !this.bk.room || !this.bk.hotel)
-        return alert("Заполните все поля")
-      try
-      {
-        const tk = localStorage.getItem("token")
-        const res = await fetch("http://176.108.251.188:3000/bookHotel",
-        {
-          method: "POST",
-          headers:
-          {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + tk
-          },
-          body: JSON.stringify(this.bk)
-        })
-        const data = await res.json()
-        if (res.ok)
-          alert(data.msg)
-        else
-          alert(data.msg)
-      }
-      catch (e)
-      {
-        alert("Ошибка")
-      }
+async bookHotel() {
+  if (!this.bk.date || !this.bk.room || !this.bk.hotel) {
+    return alert("Заполните все поля");
+  }
+  try {
+    const tk = localStorage.getItem("token");
+    const response = await fetch("http://176.108.251.188:3000/bookHotel", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + tk
+      },
+      body: JSON.stringify({
+        hotelId: this.bk.hotel,
+        roomType: this.bk.room,
+        checkInDate: this.bk.date
+      })
+    });
+
+    const data = await response.json();
+    
+    if (response.ok) {
+      alert(data.message || "Бронирование успешно!");
+      this.closeModal();
+    } else {
+      alert(data.message || "Ошибка бронирования");
     }
+  } catch (e) {
+    console.error("Ошибка:", e);
+    alert("Ошибка соединения с сервером");
+  }
+}
   },
   created()
   {
