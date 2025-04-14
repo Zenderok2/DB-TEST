@@ -142,16 +142,21 @@ app.post("/bookHotel", async (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const userId = decoded.userId;
 
-    // Исправленные названия полей
     const { hotelId, roomType, checkInDate } = req.body;
 
+    // Валидация входящих данных
     if (!hotelId || !roomType || !checkInDate) {
-      return res.status(400).json({ message: "Все поля обязательны" });
+      return res.status(400).json({ message: "Все поля обязательны для заполнения" });
     }
 
-    // Поиск комнаты
+    // Проверка формата даты
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkInDate)) {
+      return res.status(400).json({ message: "Неверный формат даты. Используйте YYYY-MM-DD" });
+    }
+
+    // Поиск доступной комнаты
     const roomResult = await db.query(
-      `SELECT room_id, price 
+      `SELECT room_id, price, room_count 
        FROM "Rooms" 
        WHERE hotel_id = $1 
          AND LOWER(status) = LOWER($2)
@@ -160,20 +165,34 @@ app.post("/bookHotel", async (req, res) => {
     );
 
     if (roomResult.rows.length === 0) {
-      return res.status(404).json({ message: "Комната недоступна" });
+      return res.status(404).json({ message: "Нет доступных номеров выбранного типа" });
     }
+
+    // Рассчет даты выезда (+1 день)
+    const checkInDateObj = new Date(checkInDate);
+    const checkOutDateObj = new Date(checkInDateObj);
+    checkOutDateObj.setDate(checkInDateObj.getDate() + 1);
+
+    // Форматирование дат для PostgreSQL
+    const formattedCheckIn = checkInDateObj.toISOString().split('T')[0];
+    const formattedCheckOut = checkOutDateObj.toISOString().split('T')[0];
 
     // Создание бронирования
     const bookingResult = await db.query(
-      `INSERT INTO "Bookings" 
-        (user_id, room_id, checkindate, checkoutdate, totalprice, paystatus)
-       VALUES ($1, $2, $3, $4, $5, 'pending')
+      `INSERT INTO "Bookings" (
+        user_id, 
+        room_id, 
+        checkindate, 
+        checkoutdate, 
+        totalprice, 
+        paystatus
+       ) VALUES ($1, $2, $3, $4, $5, 'pending')
        RETURNING booking_id`,
       [
         userId,
         roomResult.rows[0].room_id,
-        checkInDate,
-        new Date(checkInDate).setDate(new Date(checkInDate).getDate() + 1),
+        formattedCheckIn,
+        formattedCheckOut,
         roomResult.rows[0].price
       ]
     );
@@ -186,20 +205,22 @@ app.post("/bookHotel", async (req, res) => {
       [roomResult.rows[0].room_id]
     );
 
-    res.status(201).json({ 
-      message: "Бронирование успешно",
-      bookingId: bookingResult.rows[0].booking_id 
+    res.status(201).json({
+      message: "Бронирование успешно создано",
+      bookingId: bookingResult.rows[0].booking_id,
+      checkInDate: formattedCheckIn,
+      checkOutDate: formattedCheckOut
     });
 
   } catch (error) {
     console.error("Ошибка бронирования:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Ошибка сервера",
-      error: error.message 
+      error: error.message,
+      hint: "Проверьте формат передаваемых дат (YYYY-MM-DD)"
     });
   }
 });
-
 // Получение профиля пользователя
 app.get("/profile", async (req, res) => {
   try {
