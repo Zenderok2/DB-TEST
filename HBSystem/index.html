@@ -76,14 +76,16 @@
         <h2>Бронирование отеля</h2>
         <p>Выберите отель и номер, затем дату заезда:</p>
         <select v-model="bk.hotel">
-          <option v-for="h in hotels" :value="h.id">{{ h.name }}</option>
+        <option v-for="h in hotels" :value="h.id">{{ h.name }}</option>
         </select>
+
         <select v-model="bk.room">
-          <option v-for="rm in curHotelRooms" :value="rm.type">
-            {{ rm.type }} - {{ rm.price }} руб/ночь
-          </option>
-        </select>
-        <input type="date" v-model="bk.date">
+        <option v-for="rm in curHotelRooms" :value="rm.type">
+    {{ rm.type }} - {{ rm.price }} руб/ночь
+  </option>
+</select>
+
+<input type="date" v-model="bk.date" min="{{ new Date().toISOString().split('T')[0] }}">
         <button @click="bookHotel">Забронировать</button>
       </template>
       <template v-else>
