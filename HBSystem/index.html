@@ -69,67 +69,63 @@
       </button>
     </div>
   </section>
+
   <!-- Модальное окно -->
   <div class="modal" v-if="isMod">
-<div class="modal" v-if="isMod">
-  <div class="modal-content">
-    <template v-if="isAuth">
-      <h2>Бронирование отеля</h2>
-      
-      <!-- Выбор отеля -->
-      <select v-model="selectedHotel">
-        <option v-for="hotel in hotels" :value="hotel.id">
-          {{ hotel.name }}
-        </option>
-      </select>
-
-      <!-- Выбор дат -->
-      <div class="date-picker">
-        <label>Дата заезда:</label>
-        <input 
-          type="date" 
-          v-model="checkInDate"
-          :min="minCheckInDate"
-          @change="updateCheckOutLimits"
-        >
+    <div class="modal-content">
+      <template v-if="isAuth">
+        <h2>Бронирование отеля</h2>
         
-        <label>Дата выезда:</label>
-        <input 
-          type="date" 
-          v-model="checkOutDate"
-          :min="checkInDate"
-          :max="maxCheckOutDate"
-        >
-      </div>
+        <!-- Выбор отеля -->
+        <select v-model="selectedHotel">
+          <option v-for="hotel in hotels" :value="hotel.id">
+            {{ hotel.name }}
+          </option>
+        </select>
 
-      <!-- Выбор номера -->
-      <div v-if="availableRooms.length > 0">
-        <h3>Доступные номера:</h3>
-        <div class="room-grid">
-          <div 
-            v-for="room in availableRooms" 
-            class="room-card"
-            @click="selectRoom(room)"
+        <!-- Выбор дат -->
+        <div class="date-picker">
+          <label>Дата заезда:</label>
+          <input 
+            type="date" 
+            v-model="checkInDate"
+            :min="minCheckInDate"
+            @change="updateCheckOutLimits"
           >
-            <h4>{{ room.status }} №{{ room.room_number }}</h4>
-            <p>Цена: {{ room.price }} руб/ночь</p>
+          
+          <label>Дата выезда:</label>
+          <input 
+            type="date" 
+            v-model="checkOutDate"
+            :min="checkInDate"
+            :max="maxCheckOutDate"
+          >
+        </div>
+
+        <!-- Выбор номера -->
+        <div v-if="availableRooms.length > 0">
+          <h3>Доступные номера:</h3>
+          <div class="room-grid">
+            <div 
+              v-for="room in availableRooms" 
+              class="room-card"
+              @click="selectRoom(room)"
+            >
+              <h4>{{ room.status }} №{{ room.room_number }}</h4>
+              <p>Цена: {{ room.price }} руб/ночь</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <button @click="bookHotel">Подтвердить</button>
-    </template>
-  </div>
-</div>
-
-<input type="date" v-model="bk.date" min="{{ new Date().toISOString().split('T')[0] }}">
-        <button @click="bookHotel">Забронировать</button>
+        <button @click="bookHotel">Подтвердить</button>
+        <button class="close" @click="closeModal">Закрыть</button>
       </template>
+      
       <template v-else>
         <h2>Для бронирования необходимо зарегистрироваться</h2>
         <button @click="goToRegister">Зарегистрироваться</button>
+        <button class="close" @click="closeModal">Закрыть</button>
       </template>
-      <button class="close" @click="closeModal">Закрыть</button>
     </div>
   </div>
 </body>
