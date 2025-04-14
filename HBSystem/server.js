@@ -157,9 +157,9 @@ app.post("/bookHotel", async (req, res) => {
       return res.status(400).json({ message: errorMessages.join(", ") });
     }
 
-    // 2. Проверка формата дат
+    // 2. Проверка формата дат (ИСПРАВЛЕН СИНТАКСИС)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(checkInDate) {
+    if (!dateRegex.test(checkInDate)) { // Добавлена закрывающая скобка
       return res.status(400).json({ message: "Неверный формат даты заезда" });
     }
     if (!dateRegex.test(checkOutDate)) {
