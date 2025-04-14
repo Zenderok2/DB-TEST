@@ -142,41 +142,39 @@ app.post("/bookHotel", async (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const userId = decoded.userId;
 
+    // Исправленные названия полей
     const { hotelId, roomType, checkInDate } = req.body;
 
     if (!hotelId || !roomType || !checkInDate) {
-      return res.status(400).json({ message: "Все поля обязательны для заполнения" });
+      return res.status(400).json({ message: "Все поля обязательны" });
     }
 
-    // Поиск доступной комнаты
-    const room = await db.query(
-      `SELECT room_id, price FROM "Rooms" 
+    // Поиск комнаты
+    const roomResult = await db.query(
+      `SELECT room_id, price 
+       FROM "Rooms" 
        WHERE hotel_id = $1 
          AND LOWER(status) = LOWER($2)
          AND room_count > 0`,
       [hotelId, roomType]
     );
 
-    if (room.rows.length === 0) {
-      return res.status(404).json({ message: "Нет доступных комнат выбранного типа" });
+    if (roomResult.rows.length === 0) {
+      return res.status(404).json({ message: "Комната недоступна" });
     }
 
-    // Расчет даты выезда
-    const checkOutDate = new Date(checkInDate);
-    checkOutDate.setDate(checkOutDate.getDate() + 1);
-
     // Создание бронирования
-    const newBooking = await db.query(
+    const bookingResult = await db.query(
       `INSERT INTO "Bookings" 
         (user_id, room_id, checkindate, checkoutdate, totalprice, paystatus)
        VALUES ($1, $2, $3, $4, $5, 'pending')
        RETURNING booking_id`,
       [
         userId,
-        room.rows[0].room_id,
+        roomResult.rows[0].room_id,
         checkInDate,
-        checkOutDate.toISOString().split('T')[0],
-        room.rows[0].price
+        new Date(checkInDate).setDate(new Date(checkInDate).getDate() + 1),
+        roomResult.rows[0].price
       ]
     );
 
@@ -185,12 +183,12 @@ app.post("/bookHotel", async (req, res) => {
       `UPDATE "Rooms" 
        SET room_count = room_count - 1 
        WHERE room_id = $1`,
-      [room.rows[0].room_id]
+      [roomResult.rows[0].room_id]
     );
 
-    res.status(201).json({
-      message: "Бронирование успешно создано",
-      bookingId: newBooking.rows[0].booking_id
+    res.status(201).json({ 
+      message: "Бронирование успешно",
+      bookingId: bookingResult.rows[0].booking_id 
     });
 
   } catch (error) {
